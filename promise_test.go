@@ -1,7 +1,10 @@
 package go_promise_test
 
 import (
+	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"net/http"
 	"reflect"
 	"runtime"
 	"testing"
@@ -25,6 +28,24 @@ func workloadGen(i interface{}, options ...interface{}) go_promise.Workload {
 	}
 
 	return go_promise.Workload{Command: command, FallbackVal: fallbackVal}
+}
+
+func GetTodoById(id string) (interface{}, error) {
+	resp, err := http.Get("https://jsonplaceholder.typicode.com/todos/" + id)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var res interface{}
+	err = json.Unmarshal(body, &res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func TestPromise_AllSettled(t *testing.T) {
@@ -63,6 +84,34 @@ func TestPromise_AllSettled(t *testing.T) {
 		if len(got) != c {
 			t.Fatalf("got: %+v, want: %+v", got, c)
 		}
+	})
+
+	t.Run("should handle the real world workloads", func(t *testing.T) {
+		ws := []go_promise.Workload{
+			{Command: func(args ...interface{}) interface{} {
+				res, err := GetTodoById("1")
+				if err != nil {
+					return err
+				}
+				return res
+			}},
+			{Command: func(args ...interface{}) interface{} {
+				res, err := GetTodoById("2")
+				if err != nil {
+					return err
+				}
+				return res
+			}},
+			{Command: func(args ...interface{}) interface{} {
+				res, err := GetTodoById("a")
+				if err != nil {
+					return err
+				}
+				return res
+			}},
+		}
+		got := p.AllSettled(ws)
+		t.Logf("got: %+v", got)
 	})
 }
 

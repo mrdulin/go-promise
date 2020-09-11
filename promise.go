@@ -133,6 +133,9 @@ func (p *promise) Race(iterable []Workload) *Result {
 // RaceAll
 // https://stackoverflow.com/a/48578424/6463558
 func (p *promise) RaceAll(iterable []Workload) []Result {
+	if len(iterable) == 0 {
+		return nil
+	}
 	ws := []Workload{}
 	rc := make(chan *Result)
 	rs := []*Result{}
