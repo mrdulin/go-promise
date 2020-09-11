@@ -1,5 +1,7 @@
 # go-promise
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/mrdulin/go-promise)](https://goreportcard.com/report/github.com/mrdulin/go-promise)
+
 Go language implementation of [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) static method in JavaScript.
 In order to use the promise concurrency model for concurrent programming. Friendly for JavaScript programmers.
 
@@ -12,5 +14,8 @@ In order to use the promise concurrency model for concurrent programming. Friend
 
 Support more Promise extension APIs in the future.
 
+### Testing
 
-
+```bash
+go test -v -race
+```
