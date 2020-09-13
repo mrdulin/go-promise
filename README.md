@@ -11,7 +11,9 @@ In order to use the promise concurrency model for concurrent programming. Friend
 - [Promise.all()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all)
 - [Promise.allSettled()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled)
 - [Promise.race](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race)
+- [Promise.any](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise/any)
 - [Promise.raceAll](https://stackoverflow.com/a/48578424/6463558)
+- [Promise.some](http://bluebirdjs.com/docs/api/promise.some.html)
 
 Support more Promise extension APIs in the future.
 

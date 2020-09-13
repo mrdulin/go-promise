@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -320,6 +321,85 @@ func TestPromise_Any(t *testing.T) {
 		t.Logf("goroutine num: %d", runtime.NumGoroutine())
 		if len(got) != 1 {
 			t.Fatalf("got: %+v, want: %+v", len(got), 1)
+		}
+	})
+}
+
+// test cases: https://github.com/petkaantonov/bluebird/blob/master/test/mocha/some.js
+func TestPromise_Some(t *testing.T) {
+	p := go_promise.NewPromise(go_promise.Options{})
+	t.Run("should reject with range error when impossible to fulfill", func(t *testing.T) {
+		w1 := workloadGen(1)
+		w2 := workloadGen(2)
+		w3 := workloadGen(3)
+		ws := []go_promise.Workload{w1, w2, w3}
+		got := p.Some(ws, 4)
+		want := []go_promise.Result{{Idx: 0, R: errors.New("Range error: count, count should be less than or equal to the length of iterable")}}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %+v, want: %+v", got, want)
+		}
+	})
+	t.Run("should fulfill with empty array with 0", func(t *testing.T) {
+		w1 := workloadGen(1)
+		w2 := workloadGen(2)
+		w3 := workloadGen(3)
+		ws := []go_promise.Workload{w1, w2, w3}
+		got := p.Some(ws, 0)
+		var want []go_promise.Result
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %#v, want: %#v", got, want)
+		}
+	})
+	t.Run("should reject empty input", func(t *testing.T) {
+		got := p.Some([]go_promise.Workload{}, 1)
+		want := []go_promise.Result{{R: go_promise.ErrRange}}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %#v, want: %#v", got, want)
+		}
+	})
+	t.Run("should resolve values array", func(t *testing.T) {
+		w1 := workloadGen(1)
+		w2 := workloadGen(2)
+		w3 := workloadGen(3)
+		ws := []go_promise.Workload{w1, w2, w3}
+		var count uint = 2
+		got := p.Some(ws, count)
+		if len(got) != 2 {
+			t.Fatalf("got: %#v, want: %#v", len(got), count)
+		}
+	})
+
+	t.Run("should reject with all rejected input values if resolving howMany becomes impossible", func(t *testing.T) {
+		err1 := errors.New("1")
+		err2 := errors.New("2")
+		w1 := workloadGen(err1)
+		w2 := workloadGen(err2)
+		w3 := workloadGen(3)
+		ws := []go_promise.Workload{w1, w2, w3}
+		got := p.Some(ws, 2)
+		want := []go_promise.Result{{Idx: 0, R: err1}, {Idx: 1, R: err2}}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %#v, want: %#v", got, want)
+		}
+	})
+
+	t.Run("should not goroutine memory leak", func(t *testing.T) {
+		ws := []go_promise.Workload{}
+		c := 100
+		for i := 0; i < c; i++ {
+			if i < 50 {
+				ws = append(ws, workloadGen(i))
+			} else {
+				ws = append(ws, workloadGen(errors.New(strconv.Itoa(i))))
+			}
+		}
+		var count uint = 40
+		t.Logf("goroutine num: %d", runtime.NumGoroutine())
+		got := p.Some(ws, count)
+		time.Sleep(time.Second * 5)
+		t.Logf("goroutine num: %d", runtime.NumGoroutine())
+		if !reflect.DeepEqual(len(got), int(count)) {
+			t.Fatalf("got: %#v, want: %#v", len(got), int(count))
 		}
 	})
 }

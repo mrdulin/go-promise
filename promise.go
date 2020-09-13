@@ -1,8 +1,13 @@
 package go_promise
 
 import (
+	"errors"
 	"sort"
 	"time"
+)
+
+var (
+	ErrRange error = errors.New("Range error: count, count should be less than or equal to the length of iterable")
 )
 
 var TimeoutWrapper = func(workload Workload, timeout time.Duration) Command {
@@ -170,12 +175,20 @@ func (p *promise) RaceAll(iterable []Workload) []Result {
 }
 
 func (p *promise) Any(iterable []Workload) []Result {
-	if len(iterable) == 0 {
+	return p.Some(iterable, 1)
+}
+
+func (p *promise) Some(iterable []Workload, count uint) []Result {
+	if len(iterable) < int(count) {
+		return []Result{{R: ErrRange}}
+	}
+	if len(iterable) == 0 || count == 0 {
 		return nil
 	}
 	errc := make(chan Result, len(iterable))
 	c := make(chan Result, len(iterable))
 	r := []Result{}
+	errs := []Result{}
 	for idx, iter := range iterable {
 		idx := idx
 		iter := iter
@@ -191,15 +204,22 @@ func (p *promise) Any(iterable []Workload) []Result {
 	for {
 		select {
 		case result := <-c:
-			return []Result{result}
-		case result := <-errc:
 			r = append(r, result)
-			if len(r) == len(iterable) {
+			if len(r) == int(count) {
 				sort.Slice(r, func(i, j int) bool {
 					return r[i].Idx < r[j].Idx
 				})
 				return r
 			}
+		case result := <-errc:
+			errs = append(errs, result)
+			if (len(errs)+len(r)) == len(iterable) && len(r) < int(count) {
+				sort.Slice(errs, func(i, j int) bool {
+					return errs[i].Idx < errs[j].Idx
+				})
+				return errs
+			}
 		}
 	}
+
 }
