@@ -150,6 +150,19 @@ func TestPromise_All(t *testing.T) {
 			t.Fatalf("got: %+v, want: %+v", got, err)
 		}
 	})
+
+	t.Run("should cancel rest promises if any promise is rejected", func(t *testing.T) {
+		err := errors.New("2")
+		w1 := workloadGen(1, time.Duration(1))
+		w2 := workloadGen(err, time.Duration(2))
+		w3 := workloadGen(3, time.Duration(3))
+		ws := []go_promise.Workload{w1, w2, w3}
+		got := p.All(ws)
+		want := []go_promise.Result{{Idx: 1, R: err}}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %#v, want: %#v", got, want)
+		}
+	})
 }
 
 func TestPromise_Race(t *testing.T) {
@@ -262,6 +275,51 @@ func TestPromise_RaceAll(t *testing.T) {
 		t.Logf("goroutine num: %d", runtime.NumGoroutine())
 		if len(got) != c {
 			t.Fatalf("got: %+v, want: %+v", got, c)
+		}
+	})
+}
+
+func TestPromise_Any(t *testing.T) {
+	p := go_promise.NewPromise(go_promise.Options{})
+	t.Run("should return the value if any promise is resolved", func(t *testing.T) {
+		w1 := workloadGen(1)
+		w2 := workloadGen(errors.New("workload 2"))
+		w3 := workloadGen(errors.New("workload 3"))
+		ws := []go_promise.Workload{w1, w2, w3}
+		got := p.Any(ws)
+		want := []go_promise.Result{{Idx: 0, R: 1}}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %+v, want: %+v", got, want)
+		}
+	})
+
+	t.Run("should return the errors if all promises are rejected", func(t *testing.T) {
+		err1 := errors.New("workload 1")
+		err2 := errors.New("workload 2")
+		err3 := errors.New("workload 3")
+		w1 := workloadGen(err1)
+		w2 := workloadGen(err2)
+		w3 := workloadGen(err3)
+		ws := []go_promise.Workload{w1, w2, w3}
+		got := p.Any(ws)
+		want := []go_promise.Result{{Idx: 0, R: err1}, {Idx: 1, R: err2}, {Idx: 2, R: err3}}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %+v, want: %+v", got, want)
+		}
+	})
+
+	t.Run("should not goroutine memory leak", func(t *testing.T) {
+		ws := []go_promise.Workload{}
+		c := 100
+		for i := 0; i < c; i++ {
+			ws = append(ws, workloadGen(i))
+		}
+		t.Logf("goroutine num: %d", runtime.NumGoroutine())
+		got := p.Any(ws)
+		time.Sleep(time.Second * 5)
+		t.Logf("goroutine num: %d", runtime.NumGoroutine())
+		if len(got) != 1 {
+			t.Fatalf("got: %+v, want: %+v", len(got), 1)
 		}
 	})
 }

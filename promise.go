@@ -19,7 +19,6 @@ var TimeoutWrapper = func(workload Workload, timeout time.Duration) Command {
 			return workload.FallbackVal
 		}
 	}
-
 }
 
 type Promiser interface {
@@ -136,39 +135,71 @@ func (p *promise) RaceAll(iterable []Workload) []Result {
 	if len(iterable) == 0 {
 		return nil
 	}
+	if p.Options.Timeout == 0 {
+		return p.All(iterable)
+	}
 	ws := []Workload{}
 	rc := make(chan *Result)
 	rs := []*Result{}
 	for idx, iter := range iterable {
 		iter := iter
 		idx := idx
-		if p.Options.Timeout != 0 {
-			go func() {
-				r := p.Race([]Workload{
-					iter,
-					{Command: TimeoutWrapper(iter, p.Options.Timeout)},
-				})
-				r.Idx = idx
-				rc <- r
-			}()
-		} else {
-			ws = append(ws, iter)
-		}
+		go func() {
+			r := p.Race([]Workload{
+				iter,
+				{Command: TimeoutWrapper(iter, p.Options.Timeout)},
+			})
+			r.Idx = idx
+			rc <- r
+		}()
 	}
-	if p.Options.Timeout != 0 {
-		for i := 0; i < len(iterable); i++ {
-			rs = append(rs, <-rc)
-		}
-		sort.Slice(rs, func(i, j int) bool {
-			return rs[i].Idx < rs[j].Idx
-		})
-		for _, r := range rs {
-			result := r.R
-			ws = append(ws, Workload{Command: func(args ...interface{}) interface{} {
-				return result
-			}})
-		}
+	for i := 0; i < len(iterable); i++ {
+		rs = append(rs, <-rc)
+	}
+	sort.Slice(rs, func(i, j int) bool {
+		return rs[i].Idx < rs[j].Idx
+	})
+	for _, r := range rs {
+		result := r.R
+		ws = append(ws, Workload{Command: func(args ...interface{}) interface{} {
+			return result
+		}})
 	}
 
 	return p.All(ws)
+}
+
+func (p *promise) Any(iterable []Workload) []Result {
+	if len(iterable) == 0 {
+		return nil
+	}
+	errc := make(chan Result, len(iterable))
+	c := make(chan Result, len(iterable))
+	r := []Result{}
+	for idx, iter := range iterable {
+		idx := idx
+		iter := iter
+		go func() {
+			result := iter.Command()
+			if err, ok := result.(error); ok {
+				errc <- Result{Idx: idx, R: err}
+			} else {
+				c <- Result{Idx: idx, R: result}
+			}
+		}()
+	}
+	for {
+		select {
+		case result := <-c:
+			return []Result{result}
+		case result := <-errc:
+			r = append(r, result)
+			if len(r) == len(iterable) {
+				sort.Slice(r, func(i, j int) bool {
+					return r[i].Idx < r[j].Idx
+				})
+				return r
+			}
+		}
+	}
 }
