@@ -31,6 +31,8 @@ type Promiser interface {
 	All(iterable []Workload) []Result
 	Race(iterable []Workload) *Result
 	RaceAll(iterable []Workload) []Result
+	Any(iterable []Workload) []Result
+	Some(iterable []Workload, count uint) []Result
 }
 
 type promise struct {
